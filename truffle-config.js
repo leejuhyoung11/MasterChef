@@ -20,7 +20,8 @@
 
 const HDWalletProvider = require('@truffle/hdwallet-provider');
 //
-const mnemonic = 'zoo amazing bubble arena rural pet hover west label rifle model olympic'; // Mac OS
+//const mnemonic = 'zoo amazing bubble arena rural pet hover west label rifle model olympic'; // Mac OS
+const mnemonic = 'excuse spatial spray pitch ice busy anchor immense prison senior rival layer'; // Windows
 
 module.exports = {
   /**

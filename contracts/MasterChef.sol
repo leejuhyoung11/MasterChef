@@ -61,7 +61,7 @@ contract MasterChef is Ownable {
     }
 
     function poolLength() external view returns(uint256) { return poolInfo.length; }
-
+    function getLastRewardBlock(uint idx) external view returns(uint256) {return poolInfo[idx].lastRewardBlock;}
     function getBlockNum() public view returns(uint256) {return block.number;}
     function getPoolAlloc(uint idx) public view returns(uint256) {
         return poolInfo[idx].allocPoint;
@@ -70,11 +70,22 @@ contract MasterChef is Ownable {
         return poolInfo[idx].accCakePerShare;
     }
 
+    function getUserAmount(uint256 _pid) public view returns(uint256) {
+        UserInfo storage user = userInfo[_pid][msg.sender];
+        return user.amount;
+    }
+
+    function getUserRewardDebt(uint256 _pid) public view returns(uint256) {
+        UserInfo storage user = userInfo[_pid][msg.sender];
+        return user.rewardDebt;
+    }
+
     // Add new lp to the pool, it is OnlyOwner function
     function add(uint256 _allocPoint, IBEP20 _lptoken) public  {
         massUpdatePools();
         
         uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
+        totalAllocPoint = totalAllocPoint.add(_allocPoint);
         poolInfo.push(
             PoolInfo({
             lpToken: _lptoken, 
@@ -82,6 +93,7 @@ contract MasterChef is Ownable {
             lastRewardBlock: lastRewardBlock, 
             accCakePerShare : 0
         }));
+        updateStakingPool();
     }
 
     // Update CAKE allocation point, it is OnlyOwner function
@@ -105,7 +117,7 @@ contract MasterChef is Ownable {
         UserInfo storage user = userInfo[_pid][msg.sender];
 
         updatePool(_pid);
-
+        
         if (user.amount > 0) {
             uint256 pending = user.amount.mul(pool.accCakePerShare).div(1e12).sub(user.rewardDebt);
             if (pending > 0) { 
@@ -124,15 +136,6 @@ contract MasterChef is Ownable {
         emit Deposit(msg.sender, _pid, _amount);
     }
 
-    function getUserAmount(uint256 _pid) public view returns(uint256) {
-        UserInfo storage user = userInfo[_pid][msg.sender];
-        return user.amount;
-    }
-
-    function getUserRewardDebt(uint256 _pid) public view returns(uint256) {
-        UserInfo storage user = userInfo[_pid][msg.sender];
-        return user.rewardDebt;
-    }
 
     // Withdraw LP tokens from MasterChef
     function withdraw(uint256 _pid, uint256 _amount) public {
@@ -148,7 +151,7 @@ contract MasterChef is Ownable {
         if (pending > 0) { safeCakeTransfer(msg.sender, pending); }
         if (_amount > 0) {
             user.amount = user.amount.sub(_amount);
-            pool.lpToken.transfer(address(msg.sender), _amount);
+            pool.lpToken.safeTransfer(address(msg.sender), _amount);
         }
 
         user.rewardDebt = user.amount.mul(pool.accCakePerShare).div(1e12);
@@ -177,9 +180,10 @@ contract MasterChef is Ownable {
         }
 
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
+        // Calculate LP token reward ratio of cakePerBlock
         uint256 cakeReward = multiplier.mul(cakePerBlock).mul(pool.allocPoint).div(totalAllocPoint);
         
-        cake.mint(address(syrup), cakeReward.div(10));
+        cake.mint(devaddr, cakeReward.div(10));
         cake.mint(address(syrup), cakeReward);
 
         pool.accCakePerShare = pool.accCakePerShare.add(cakeReward.mul(1e12).div(lpSupply));
